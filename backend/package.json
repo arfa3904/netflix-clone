@@ -1,0 +1,25 @@
+{
+  "name": "netflex-clone-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Netflix Clone using Express and MySQL (Aiven)",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "express",
+    "mysql",
+    "aiven",
+    "api"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.1",
+    "mysql2": "^3.17.2"
+  }
+}

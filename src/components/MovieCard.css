@@ -1,0 +1,55 @@
+.movie-card {
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  cursor: pointer;
+  position: relative;
+  border-radius: 4px;
+  overflow: hidden;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.movie-card:hover {
+  transform: scale(1.06);
+  z-index: 5;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+.movie-card:hover .movie-card-poster {
+  filter: brightness(1.05);
+}
+
+.movie-card-poster {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  border-radius: 4px;
+  transition: filter 0.2s ease;
+}
+
+/* Default row poster size */
+.movie-card .movie-card-poster {
+  min-width: 160px;
+  max-height: 240px;
+  object-fit: cover;
+}
+
+/* First row: larger posters */
+.movie-card--large .movie-card-poster {
+  min-width: 220px;
+  max-height: 320px;
+}
+
+@media (max-width: 768px) {
+  .movie-card .movie-card-poster {
+    min-width: 120px;
+    max-height: 180px;
+  }
+  .movie-card--large .movie-card-poster {
+    min-width: 160px;
+    max-height: 240px;
+  }
+  .movie-card:hover {
+    transform: scale(1.04);
+  }
+}
