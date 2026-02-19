@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "backend": "node backend/server.js",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest",
@@ -14,7 +13,9 @@
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.21.0"
+    "react-router-dom": "^6.21.0",
+    "bcryptjs": "^2.4.3",
+    "mysql2": "^3.17.2"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",

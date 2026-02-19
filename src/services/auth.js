@@ -1,14 +1,7 @@
-// Production: VITE_API_URL from Vercel (e.g. https://your-api.onrender.com)
-// Local dev: VITE_API_URL in .env or fallback for dev server
-const API_URL = import.meta.env.VITE_API_URL || '';
+// Use relative paths - Vercel serverless functions are at /api/*
+const API_BASE = '/api';
 
 const AUTH_KEY = 'netflex_auth';
-
-function getApiBase() {
-  const url = API_URL && String(API_URL).trim();
-  if (url) return url.replace(/\/$/, '');
-  throw new Error('VITE_API_URL is not set. Add it to .env (local) or Vercel environment variables (production).');
-}
 
 export function getStoredUser() {
   try {
@@ -32,47 +25,73 @@ export function clearStoredUser() {
 }
 
 export async function register({ uname, email, phone, password }) {
-  const base = getApiBase();
   let res;
   try {
-    res = await fetch(`${base}/register`, {
+    res = await fetch(`${API_BASE}/register`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({ uname, email, phone, password }),
     });
   } catch (e) {
-    const msg = e?.message || 'Connection failed';
-    throw new Error(msg.includes('fetch') ? 'Cannot reach server. Is the backend running?' : msg);
+    console.error('[auth] Register fetch error:', e);
+    throw new Error('Cannot reach server. Please check your connection.');
   }
+
+  if (!res.ok) {
+    let errorData;
+    try {
+      errorData = await res.json();
+    } catch {
+      throw new Error(`Server error: ${res.status} ${res.statusText}`);
+    }
+    throw new Error(errorData.message || 'Registration failed');
+  }
+
   let data;
   try {
     data = await res.json();
-  } catch {
+  } catch (e) {
+    console.error('[auth] Register JSON parse error:', e);
     throw new Error('Invalid response from server');
   }
-  if (!res.ok) throw new Error(data.message || 'Registration failed');
+
   return data;
 }
 
 export async function login({ identifier, password }) {
-  const base = getApiBase();
   let res;
   try {
-    res = await fetch(`${base}/login`, {
+    res = await fetch(`${API_BASE}/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({ identifier, password }),
     });
   } catch (e) {
-    const msg = e?.message || 'Connection failed';
-    throw new Error(msg.includes('fetch') ? 'Cannot reach server. Is the backend running?' : msg);
+    console.error('[auth] Login fetch error:', e);
+    throw new Error('Cannot reach server. Please check your connection.');
   }
+
+  if (!res.ok) {
+    let errorData;
+    try {
+      errorData = await res.json();
+    } catch {
+      throw new Error(`Server error: ${res.status} ${res.statusText}`);
+    }
+    throw new Error(errorData.message || 'Login failed');
+  }
+
   let data;
   try {
     data = await res.json();
-  } catch {
+  } catch (e) {
+    console.error('[auth] Login JSON parse error:', e);
     throw new Error('Invalid response from server');
   }
-  if (!res.ok) throw new Error(data.message || 'Login failed');
+
   return data;
 }
