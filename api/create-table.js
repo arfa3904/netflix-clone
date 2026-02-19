@@ -1,13 +1,7 @@
 import { query } from './db.js';
 
 export default async function handler(req, res) {
-  // Only allow GET
-  if (req.method !== 'GET') {
-    return res.status(405).json({ 
-      success: false, 
-      message: 'Method not allowed. Use GET.' 
-    });
-  }
+  res.setHeader('Access-Control-Allow-Origin', '*');
 
   try {
     const createTableSQL = `
@@ -28,11 +22,10 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error('[create-table] Error:', error.message);
-    console.error('[create-table] Stack:', error.stack);
     return res.status(500).json({
       success: false,
       message: 'Error creating table',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      error: error.message,
     });
   }
 }

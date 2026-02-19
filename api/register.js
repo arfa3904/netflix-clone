@@ -2,6 +2,16 @@ import { query } from './db.js';
 import bcrypt from 'bcryptjs';
 
 export default async function handler(req, res) {
+  // Set CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   // Only allow POST
   if (req.method !== 'POST') {
     return res.status(405).json({ 
@@ -11,8 +21,19 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Parse request body
-    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    // Parse request body - Vercel auto-parses JSON
+    let body = req.body;
+    if (typeof body === 'string') {
+      try {
+        body = JSON.parse(body);
+      } catch (e) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid JSON in request body',
+        });
+      }
+    }
+
     const { uname, email, phone, password } = body || {};
 
     // Validate required fields
@@ -68,7 +89,7 @@ export default async function handler(req, res) {
     return res.status(500).json({
       success: false,
       message: 'Registration failed',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      error: error.message,
     });
   }
 }
