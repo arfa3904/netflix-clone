@@ -1,4 +1,4 @@
-// Use relative paths - Vercel serverless functions are at /api/*
+// Vercel serverless functions - use relative paths /api/*
 const API_BASE = '/api';
 
 const AUTH_KEY = 'netflex_auth';
