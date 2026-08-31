@@ -1,51 +1,28 @@
 // Talks to the /api/* serverless functions. The session lives in an HttpOnly
 // cookie set by the server — this file never touches localStorage or reads
 // the cookie directly, since client JS can't (and shouldn't be able to).
+import { apiFetch } from './http';
+
 const API_BASE = '/api';
 
-async function apiRequest(path, options = {}) {
-  let res;
-  try {
-    res = await fetch(`${API_BASE}${path}`, {
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-      ...options,
-    });
-  } catch {
-    throw new Error('Cannot reach the server. Check your connection and try again.');
-  }
-
-  let data = null;
-  try {
-    data = await res.json();
-  } catch {
-    // Some responses (e.g. 405) may not have a JSON body.
-  }
-
-  if (!res.ok) {
-    throw new Error(data?.message || `Request failed (${res.status})`);
-  }
-  return data;
-}
-
 export function register({ uname, email, phone, password }) {
-  return apiRequest('/register', {
+  return apiFetch(`${API_BASE}/register`, {
     method: 'POST',
     body: JSON.stringify({ uname, email, phone, password }),
   });
 }
 
 export function login({ identifier, password }) {
-  return apiRequest('/login', {
+  return apiFetch(`${API_BASE}/login`, {
     method: 'POST',
     body: JSON.stringify({ identifier, password }),
   });
 }
 
 export function logout() {
-  return apiRequest('/logout', { method: 'POST' });
+  return apiFetch(`${API_BASE}/logout`, { method: 'POST' });
 }
 
 export function fetchCurrentUser() {
-  return apiRequest('/me', { method: 'GET' });
+  return apiFetch(`${API_BASE}/me`, { method: 'GET' });
 }

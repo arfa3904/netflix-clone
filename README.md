@@ -1,176 +1,255 @@
 # CineVault
 
-A full-stack, Netflix-inspired movie browsing app: real authentication (bcrypt + JWT session cookies), a MySQL-backed user store, and a live movie catalog from [TMDB](https://www.themoviedb.org/) — trending, popular, top-rated, search, and a details view — behind a polished, original dark UI.
+A full-stack movie discovery and watchlist platform: real authentication (bcrypt + JWT session cookies), a MySQL-backed user and watchlist store, and a live movie catalog from [TMDB](https://www.themoviedb.org/) — trending, popular, top-rated, genre discovery, search, and a full details experience with cast, trailers, and recommendations.
 
-Built with **React 18 + Vite** on the frontend and **Vercel serverless functions + MySQL** on the backend. Ships as a single deployable app (one URL, no separate backend service to host).
+**CineVault is an independent portfolio project. It is not affiliated with, endorsed by, or associated with Netflix, TMDB, or any streaming service** — the name, palette, and layout are original.
 
-> Portfolio project. Not affiliated with Netflix, TMDB, or any streaming service. The UI is an original design (see [Security & design notes](#security--design-notes)).
+## Overview
 
-## Features
+Most "movie browser" tutorial projects stop at fetching a list from an API and rendering cards. CineVault goes further: it's a complete authenticated application where a signed-in user's watchlist is real, persistent, server-validated state — not a `localStorage` toy. The goal was to build something that demonstrates actual full-stack engineering: a secure session model, a real relational schema with foreign keys and unique constraints, a hardened external-API proxy, and a test suite that exercises the backend logic directly (not just the UI).
 
-- Browse **Trending**, **Popular**, and **Top Rated** movies, with a cinematic hero banner
-- **Search** movies by title (debounced, live results)
-- **Movie details** modal — genres, runtime, rating, release year, overview
-- Email/phone **registration and login**, with server-side validation and duplicate-account handling
-- Session-based auth via an **HttpOnly JWT cookie** — no tokens or passwords ever touch `localStorage`
-- Protected home route; logged-out visitors are redirected to `/login`
-- Loading skeletons, empty states, and friendly error states throughout (including a clear message if the app isn't configured yet)
-- Responsive layout: desktop, tablet, and mobile
-- Automated tests for both the API handlers and the React components
+## Key Features
 
-## Tech stack
+- **Movie discovery** — trending, popular, top-rated rows; genre filter with server-side sort (`popularity`, `rating`, `newest`) via TMDB's `/discover` endpoint, with pagination
+- **Search** — debounced, URL-driven (`?q=`), works from any page
+- **Movie details** (`/movie/:id`) — backdrop, poster, rating, runtime, genres, overview, cast, an embedded trailer, and TMDB-powered recommendations
+- **Watchlist** — add/remove from any movie card or the details page, persisted in MySQL, isolated per user, with optimistic UI and rollback on failure
+- **Authentication** — registration and login with bcrypt-hashed passwords and an HttpOnly JWT session cookie; protected routes; session persists across refresh
+- **Profile page** — username, email, phone, member-since date, watchlist count, all read from the authenticated session
+- **Loading, empty, and error states** throughout — skeletons instead of blank screens, human-readable errors instead of stack traces, "not configured" messaging when `TMDB_KEY`/DB env vars are missing
+- **Responsive** — desktop, tablet, and mobile, with a real mobile navigation panel
+- **Accessible** — semantic HTML, visible focus states, `aria-pressed`/`aria-current` where relevant, `prefers-reduced-motion` support
 
-| Layer | Choice |
-|---|---|
-| Frontend | React 18, React Router 7, Vite 5, plain CSS (design tokens, no UI framework) |
-| Backend | Vercel serverless functions (`/api`) |
-| Database | MySQL (`mysql2`), e.g. [Aiven](https://aiven.io/mysql) |
-| Auth | `bcryptjs` password hashing + `jsonwebtoken` session cookies |
-| Movie data | [TMDB API](https://www.themoviedb.org/documentation/api), proxied server-side |
-| Testing | Vitest, Testing Library, jsdom |
+## Tech Stack
+
+**Frontend** — React 18, React Router 7, Vite 5, plain CSS with a shared design-token system (no UI framework)
+
+**Backend** — Node.js, deployed as Vercel serverless functions (no separate server process to host)
+
+**Database** — MySQL ([Aiven](https://aiven.io/mysql)), via `mysql2/promise` with a pooled connection
+
+**Authentication** — `bcryptjs` password hashing (10 rounds) + `jsonwebtoken` session, delivered as an HttpOnly `SameSite=Lax` cookie
+
+**External API** — [TMDB](https://www.themoviedb.org/documentation/api), proxied server-side so the API key never reaches the browser
+
+**Testing** — Vitest, React Testing Library, jsdom
+
+**Tooling** — ESLint 9 (flat config) with `react`, `react-hooks`, and `jsx-a11y` rules
 
 ## Architecture
 
+```mermaid
+flowchart LR
+    subgraph Browser
+        UI[React SPA]
+    end
+    subgraph Server["/api (Vercel serverless)"]
+        Auth["register / login / logout / me"]
+        Profile["profile"]
+        Watch["watchlist"]
+        Proxy["tmdb (allowlisted proxy)"]
+    end
+    DB[(MySQL — users, watchlist)]
+    TMDB[(TMDB API)]
+
+    UI -- "same-origin fetch,\ncredentials included" --> Auth
+    UI --> Profile
+    UI --> Watch
+    UI --> Proxy
+    Auth -- "bcrypt + JWT cookie" --> DB
+    Profile --> DB
+    Watch -- "scoped to session user_id" --> DB
+    Proxy -- "server-side TMDB_KEY" --> TMDB
 ```
-Browser (React SPA)
-   │
-   │  same-origin fetch, credentials included
-   ▼
-/api/*  (Vercel serverless functions — see api/README.md)
-   │                                   │
-   │  bcrypt + JWT cookie              │  server-side TMDB key
-   ▼                                   ▼
-MySQL (users table)                 TMDB API
+
+The frontend never talks to MySQL or TMDB directly. In production, Vercel invokes the files in `/api` directly. Locally, [`dev-server.js`](./dev-server.js) runs those *same* handler files behind a plain Node HTTP server (via Vite's dev proxy) — one implementation, not a parallel mock backend.
+
+## Database
+
+Two tables, both created/migrated idempotently by [`scripts/init-db.js`](./scripts/init-db.js):
+
+```mermaid
+erDiagram
+    users ||--o{ watchlist : owns
+    users {
+        int id PK
+        varchar uname
+        varchar email UK
+        varchar phone UK
+        varchar password "bcrypt hash"
+        timestamp created_at
+    }
+    watchlist {
+        int id PK
+        int user_id FK
+        int movie_id
+        varchar movie_title
+        varchar poster_path
+        varchar release_date
+        decimal vote_average
+        timestamp created_at
+    }
 ```
 
-- **The frontend never talks to TMDB or MySQL directly.** All movie requests go through `/api/tmdb`, which holds the TMDB key server-side; all auth goes through `/api/register`, `/api/login`, `/api/logout`, `/api/me`.
-- **Sessions are a signed JWT in an HttpOnly, SameSite=Lax cookie**, set by the server and never readable from client JS — not a user object sitting in `localStorage`.
-- **One backend, two runtimes.** In production, Vercel invokes the files in `/api` directly. Locally, [`dev-server.js`](./dev-server.js) runs those *same* files behind a plain Node HTTP server (via Vite's dev proxy), so there's no separate/duplicated backend implementation to keep in sync. See [`api/README.md`](./api/README.md) for endpoint-level details.
+- `users.email` and `users.phone` are `UNIQUE` — enforced at the database level, not just the application layer, closing a check-then-insert race condition.
+- `watchlist` has a composite `UNIQUE (user_id, movie_id)` — a duplicate "add" is impossible to persist twice, and the API treats hitting it as a harmless no-op rather than an error.
+- `watchlist.user_id` is a foreign key with `ON DELETE CASCADE` — deleting a user cleans up their watchlist automatically.
+- Movie fields (title, poster, rating) are denormalized into `watchlist` rather than re-fetched from TMDB on every page load — the "My List" page renders from one query, and stays intact even if a title is later removed from TMDB.
 
-## Screenshots
+## Authentication
 
-_Add screenshots of the home page, search, movie details modal, and auth pages here before publishing (e.g. `docs/screenshots/home.png`)._
+1. **Register** — server validates email/phone/password format, hashes the password with bcrypt, inserts the row, and immediately signs the user in.
+2. **Login** — server looks up by email or phone, compares with `bcrypt.compare`, and on success signs a JWT (`{ sub, uname, email }`) into an **HttpOnly, `SameSite=Lax`** cookie. It's `Secure` in production.
+3. **Every request** to `/api/watchlist`, `/api/profile`, `/api/me` reads the session from that cookie server-side (`api/_session.js`) — the frontend never handles or stores a token; `AuthContext` just asks `/api/me` on load and reacts to the result.
+4. **Logout** clears the cookie.
 
-## Installation
+Both login and registration failures return one generic message ("Invalid email/phone or password") rather than confirming *which* part was wrong, so the API can't be used to enumerate registered accounts.
+
+## API
+
+| Route | Method | Auth | Purpose |
+|---|---|---|---|
+| `/api/register` | POST | — | Create an account, then sign in |
+| `/api/login` | POST | — | Verify credentials, start a session |
+| `/api/logout` | POST | — | End the session |
+| `/api/me` | GET | session | Current user (used for route protection) |
+| `/api/profile` | GET | session | Extended profile: member-since date, watchlist count |
+| `/api/watchlist` | GET / POST / DELETE | session | List / add / remove a saved movie, scoped to the caller |
+| `/api/tmdb` | GET | — | Allowlisted server-side TMDB proxy |
+
+Every write endpoint derives the acting user from the verified session (`getSessionFromRequest`) — **never** from a client-supplied `user_id`, so one user cannot read or modify another's watchlist by editing a request. Full details in [`api/README.md`](./api/README.md).
+
+## TMDB Integration
+
+`api/tmdb.js` is the only thing that ever calls `api.themoviedb.org`. It:
+
+- Holds `TMDB_KEY` as a server-only environment variable (no `VITE_` prefix — that would bundle it into client JS)
+- Allowlists specific endpoint prefixes (`/trending/movie`, `/movie/{id}`, `/search/movie`, `/discover/movie`, …) so it can't be turned into an open relay for arbitrary URLs
+- Uses `node:https` rather than the global `fetch` — during development, Node's built-in `fetch` (undici) intermittently returned `ECONNRESET` against TMDB on some networks, while plain `node:https` didn't; the proxy also retries once on a transient network error
+- Sets a short `Cache-Control` header so repeated requests for the same list within a few minutes don't all hit TMDB
+
+## Testing
+
+```bash
+npm test
+```
+
+**Current result: 52/52 tests passing, across 9 test files** (last verified locally — re-run `npm test` yourself to confirm, since this number will drift as the suite grows). Coverage spans:
+
+- **API handlers** (`api/*.test.js`) — registration/login validation, duplicate accounts, wrong credentials, database failures, TMDB missing-config/upstream-failure/network-retry behavior — testing the real handler code with `db`/`bcrypt`/`https` mocked, not reimplemented logic.
+- **Components & pages** (`src/**/*.test.jsx`) — protected route redirect/loading states, movie card rendering and broken-image fallback and watchlist toggle, row loading/error/empty states, login/register validation and submission.
+
+## Performance
+
+- Movie posters use `loading="lazy"`.
+- The TMDB proxy sends `Cache-Control: s-maxage=300, stale-while-revalidate=600` so repeated identical requests are cheap.
+- Genre/discover results paginate via "Load more" rather than fetching everything up front.
+- The watchlist toggle is optimistic (UI updates immediately, rolls back only if the request fails) instead of blocking on a round trip.
+
+## Responsive Design
+
+Every page — home, search, movie details, watchlist, profile, auth — is laid out with CSS Grid/Flexbox and `clamp()`-based spacing/typography, tested at desktop (1440px) and mobile (390px) widths. The navbar collapses to a slide-down panel with its own search and nav links below ~860px.
+
+## Project Structure
+
+```
+├── api/                       # Vercel serverless functions (the backend)
+│   ├── _session.js            # JWT sign/verify + HttpOnly cookie helpers
+│   ├── _validate.js           # Shared input validation
+│   ├── db.js                  # MySQL pool
+│   ├── register.js, login.js, logout.js, me.js, profile.js
+│   ├── watchlist.js           # GET/POST/DELETE, session-scoped
+│   ├── tmdb.js                # Allowlisted server-side TMDB proxy
+│   └── *.test.js
+├── dev-server.js               # Local adapter that runs api/*.js outside Vercel
+├── scripts/init-db.js          # Idempotent schema creation + migrations
+├── src/
+│   ├── components/              # Navbar, Banner, Row, MovieCard, Discover, Footer, ProtectedRoute…
+│   ├── context/                 # AuthContext, WatchlistContext
+│   ├── pages/                   # Home, Login, Register, MovieDetails, Watchlist, Profile
+│   ├── services/                 # http.js (shared fetch helper), auth.js, api.js, watchlist.js, profile.js
+│   └── styles/variables.css      # Design tokens
+├── eslint.config.js
+├── vite.config.js
+└── vercel.json
+```
+
+## Local Development
 
 Requires Node.js 18+.
 
 ```bash
-git clone <this-repo-url>
-cd netflix-clone
 npm install
+cp .env.example .env    # then fill in TMDB_KEY, JWT_SECRET, DB_*  (see below)
+npm run db:init           # creates/migrates the users + watchlist tables
+npm run dev                # http://127.0.0.1:5173 (Vite + local API adapter, together)
 ```
 
-## Environment variables
+`npm run dev` runs the Vite dev server **and** [`dev-server.js`](./dev-server.js) together (via `concurrently`), so `/api/*` works locally without the Vercel CLI. Movie browsing works as soon as `TMDB_KEY` is set; auth additionally needs the `DB_*` variables — without them, the affected endpoints return a clear "server is not configured" message instead of crashing.
 
-Copy `.env.example` to `.env` and fill in the values:
+## Environment Variables
 
-```bash
-cp .env.example .env
-```
-
-| Variable | Required for | Notes |
+| Variable | Used by | Notes |
 |---|---|---|
-| `TMDB_KEY` | Movie data | Server-side only. Get a free key at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api). **Never** prefix this with `VITE_` — that would ship it to the browser. |
-| `JWT_SECRET` | Auth | Any long random string. Generate one with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. |
-| `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | Auth | MySQL connection details. |
+| `TMDB_KEY` | `/api/tmdb` | Server-side only. Free key at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api) |
+| `JWT_SECRET` | `/api/_session.js` | Any long random string — generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
+| `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | `/api/db.js` | MySQL connection. Managed providers (Aiven included) typically assign a non-default port — check your dashboard |
 
-On Vercel, add the same variables under **Project Settings → Environment Variables** for Production, Preview, and Development.
+See [`.env.example`](./.env.example). Real values live only in `.env`, which is gitignored — never commit it, and never paste real values into a PR, issue, or screenshot.
 
-## Local development
-
-```bash
-npm run dev
-```
-
-This runs the Vite dev server **and** the local API adapter together (via `concurrently`):
-- Frontend: http://127.0.0.1:5173
-- API adapter: http://localhost:5001 (proxied from `/api/*` on the Vite server — you shouldn't need to hit it directly)
-
-Movie browsing works as soon as `TMDB_KEY` is set. Registration/login additionally require the database variables — without them, `/api/register` and `/api/login` return a clear "server is not configured" error instead of crashing.
-
-Run frontend and API separately if you prefer: `npm run dev:web` / `npm run dev:api`.
-
-## Database setup
-
-Once `DB_*` is set in `.env` (or you're pointing at a real MySQL instance — Aiven, PlanetScale-compatible, local MySQL, etc.):
+## Database Setup
 
 ```bash
 npm run db:init
 ```
 
-This creates the `users` table (with unique indexes on `email` and `phone`) if it doesn't already exist. It's a local script, not an HTTP endpoint — nobody can trigger it remotely just by finding the URL.
-
-## API overview
-
-See [`api/README.md`](./api/README.md) for the full endpoint list, request/response shapes, and the session model. Summary:
-
-| Route | Method | Purpose |
-|---|---|---|
-| `/api/register` | POST | Create an account, then sign in |
-| `/api/login` | POST | Verify credentials, start a session |
-| `/api/logout` | POST | End the session |
-| `/api/me` | GET | Current user for the active session |
-| `/api/tmdb` | GET | Server-side TMDB proxy (allowlisted endpoints only) |
-
-## Testing
-
-```bash
-npm test          # run once
-npm run test:watch
-npm run test:ui
-```
-
-48 tests across 9 files, covering:
-- **API handlers** (`api/*.test.js`) — validation, duplicate accounts, wrong credentials, database failures, TMDB config/network/upstream failures, retry behavior — all with the real handler code and mocked `db`/`bcrypt`/`https`.
-- **Components** (`src/**/*.test.jsx`) — protected route redirect/loading/auth states, movie card rendering and broken-image fallback, row loading/error/empty states, login and register form validation and submission.
+Idempotent and safe to re-run: it creates the tables if they don't exist, and for a `users` table created by an earlier version of this schema, additively applies any missing column/index (e.g. `created_at`, the unique indexes) without touching existing rows. It's a local script rather than an HTTP endpoint on purpose — the project's first iteration had a public, unauthenticated `/api/create-table` route, which this replaces.
 
 ## Deployment (Vercel)
 
-1. Push this repo to GitHub.
-2. Import it in Vercel — it auto-detects Vite (`npm run build`, output `dist`).
-3. Add the environment variables listed above under Project Settings.
-4. Deploy.
-5. Run `npm run db:init` once **locally**, pointed at the same database (via `.env`), to create the `users` table — or run the equivalent `CREATE TABLE` manually against your database.
-6. Visit the deployed URL, register an account, and confirm login works.
+1. Push to GitHub, import the repo in Vercel — it auto-detects Vite (`npm run build`, output `dist`).
+2. Add the environment variables above under Project Settings (Production, Preview, Development).
+3. Deploy.
+4. Run `npm run db:init` once locally against the same database to create/migrate the schema.
+5. Visit the deployed URL and confirm register → login → browse → watchlist works end to end.
 
-No separate backend host is needed — `vercel.json` just builds the Vite app; the `/api` folder is deployed automatically as serverless functions on the same domain, so there's no CORS to configure.
+No separate backend host is needed — the `/api` folder deploys automatically as serverless functions on the same domain as the frontend, so there's no CORS to configure.
 
-## Project structure
+## Screenshots
 
-```
-├── api/                    # Vercel serverless functions (the backend)
-│   ├── _session.js         # JWT sign/verify + cookie helpers
-│   ├── _validate.js        # Shared input validation
-│   ├── db.js                # MySQL pool
-│   ├── register.js, login.js, logout.js, me.js
-│   ├── tmdb.js              # Server-side TMDB proxy
-│   └── *.test.js
-├── dev-server.js           # Local adapter that runs api/*.js outside Vercel
-├── scripts/init-db.js      # One-time schema setup (replaces the old public endpoint)
-├── src/
-│   ├── components/          # Navbar, Banner, Row, MovieCard, MovieDetailsModal, Footer, ProtectedRoute…
-│   ├── context/AuthContext.jsx
-│   ├── pages/                # Home, Login, Register
-│   ├── services/             # auth.js, api.js — the only files that call /api/*
-│   └── styles/variables.css  # Design tokens
-├── vite.config.js
-└── vercel.json
-```
+_Add screenshots here before sharing the repo — home page, search, movie details, watchlist, login/register, and a mobile view. (e.g. `docs/screenshots/home.png`, referenced as `![Home](docs/screenshots/home.png)`.)_
 
-## Security & design notes
+## Engineering Decisions
 
-- Passwords are hashed with `bcryptjs` (10 rounds); the hash is never returned by any API response.
-- Sessions are HttpOnly, SameSite=Lax JWT cookies — not readable by client-side JS, not stored in `localStorage`.
-- Login failures return one generic message regardless of whether the account exists or the password was wrong, to avoid confirming registered accounts.
-- The TMDB proxy allowlists specific endpoint prefixes so it can't be used as an open relay.
-- There are no public "list users" or "run this SQL" endpoints — schema setup is a local script.
-- The visual identity (name, colors, layout) is original — not a copy of Netflix's branding or UI.
+- **Server-side TMDB proxy, not a client-side key.** The original version shipped `VITE_TMDB_KEY` to the browser. Moving it behind `/api/tmdb` with an endpoint allowlist means the key is never exposed and can't be abused as an open relay.
+- **HttpOnly JWT cookie, not `localStorage`.** An earlier version stored the logged-in user object directly in `localStorage`, which is readable and editable by any script on the page. A signed, HttpOnly cookie means client-side JS — and an XSS payload, if one ever existed — can't read or forge a session.
+- **Database-level unique constraints, not just an app-level check.** Registration originally only checked "does this email exist?" before inserting — a real TOCTOU race under concurrent requests. `UNIQUE` indexes on `email`/`phone` (and the composite one on `watchlist`) make the database itself the source of truth; the app layer catches `ER_DUP_ENTRY` and returns a clean error instead of a 500.
+- **One backend implementation, two runtimes.** Rather than a Vercel-only backend that's unusable in local dev (or a separate Express server that drifts from it), `dev-server.js` is a thin adapter that runs the exact `api/*.js` files Vercel deploys.
+- **Denormalized watchlist rows.** Storing title/poster/rating alongside `movie_id` avoids an extra TMDB call per watchlist item and keeps the list intact even if TMDB later removes a title.
+- **`node:https` over `fetch` in the TMDB proxy.** Found via testing on a network where Node's global `fetch` intermittently reset connections to TMDB while `node:https` didn't — a concrete example of choosing based on observed behavior, not by default.
 
-## Future improvements
+## Future Improvements
 
-- Per-user watchlist / "My List", persisted server-side
+- Profile editing (currently read-only by design — editing email/phone safely needs re-verification, which was out of scope here)
 - Refresh-token rotation for longer-lived sessions
 - Rate limiting on `/api/login` and `/api/register`
-- Pagination / infinite scroll on search and category rows
-- E2E tests (Playwright) covering the full register → login → browse flow against a real database
+- E2E tests (Playwright) covering the full register → login → watchlist flow against a real database in CI
+
+---
+
+## Portfolio Summary
+
+**CineVault — Full-Stack Movie Discovery & Watchlist Platform**
+
+A production-style full-stack app: React 18 frontend, Node.js/Vercel serverless API, MySQL persistence, JWT session authentication, and a server-side TMDB integration — built and tested end-to-end, including against a real hosted database.
+
+**Resume (one line):**
+CineVault — full-stack movie discovery platform with JWT auth, a MySQL-backed watchlist, and a secure server-side TMDB proxy (React, Node.js, MySQL).
+
+**Resume (bullets):**
+- Built a full-stack movie discovery platform (React, Node.js/Vercel serverless, MySQL) with JWT-based authentication delivered via HttpOnly cookies and bcrypt password hashing.
+- Designed a relational schema (users, watchlist) with foreign keys and unique constraints enforced at the database level, and a session-scoped REST API preventing cross-user data access.
+- Implemented a server-side proxy for a third-party API (TMDB) with endpoint allowlisting and automatic retry on transient network failures, keeping the API key out of the client bundle.
+- Wrote an automated test suite (Vitest + React Testing Library) covering authentication, watchlist, and TMDB-proxy behavior, including database-failure and invalid-input paths.
+
+**Tech stack line:** React · React Router · Vite · Node.js · MySQL · JWT · bcrypt · TMDB API · Vitest · React Testing Library

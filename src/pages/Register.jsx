@@ -41,9 +41,11 @@ export default function Register() {
     try {
       await register({ uname: uname.trim(), email: email.trim(), phone: phone.trim(), password });
       navigate('/', { replace: true });
+      // No setLoading(false) here — navigation unmounts this component on
+      // success, so resetting state afterwards would just be a stray
+      // setState on an unmounting component.
     } catch (err) {
       setError(err.message || 'Registration failed. Try again.');
-    } finally {
       setLoading(false);
     }
   }

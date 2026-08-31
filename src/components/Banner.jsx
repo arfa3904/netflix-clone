@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './Banner.css';
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/original';
@@ -7,8 +8,9 @@ function truncate(str, n) {
   return str?.length > n ? `${str.slice(0, n - 1)}…` : str || '';
 }
 
-function Banner({ movie, onSelectMovie }) {
+function Banner({ movie }) {
   const [imgError, setImgError] = useState(false);
+  const navigate = useNavigate();
 
   if (!movie) return null;
 
@@ -50,13 +52,17 @@ function Banner({ movie, onSelectMovie }) {
         </div>
         <p className="banner-description">{truncate(movie.overview, 170)}</p>
         <div className="banner-buttons">
-          <button type="button" className="banner-button banner-button--play">
-            <span aria-hidden="true">▶</span> Play
+          <button
+            type="button"
+            className="banner-button banner-button--play"
+            onClick={() => navigate(`/movie/${movie.id}?trailer=1`)}
+          >
+            <span aria-hidden="true">▶</span> Watch Trailer
           </button>
           <button
             type="button"
             className="banner-button banner-button--list"
-            onClick={() => onSelectMovie?.(movie)}
+            onClick={() => navigate(`/movie/${movie.id}`)}
           >
             More Info
           </button>

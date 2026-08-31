@@ -4,14 +4,13 @@ import { fetchData, searchMovies } from '../services/api';
 import Navbar from '../components/Navbar';
 import Banner from '../components/Banner';
 import Row from '../components/Row';
+import Discover from '../components/Discover';
 import Footer from '../components/Footer';
-import MovieDetailsModal from '../components/MovieDetailsModal';
 
 export default function Home() {
   const [trendingMovie, setTrendingMovie] = useState(null);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState(null);
-  const [selectedMovieId, setSelectedMovieId] = useState(null);
   const [searchParams] = useSearchParams();
   const query = (searchParams.get('q') || '').trim();
 
@@ -71,7 +70,6 @@ export default function Home() {
 
   return (
     <>
-      <div id="top" />
       <Navbar />
 
       {apiError && (
@@ -96,16 +94,12 @@ export default function Home() {
         </div>
       )}
 
-      {!loading && !apiError && !query && <Banner movie={trendingMovie} onSelectMovie={(m) => setSelectedMovieId(m.id)} />}
+      {!loading && !apiError && !query && <Banner movie={trendingMovie} />}
 
       <div className="app-content">
         {query ? (
           <div style={{ paddingTop: 'calc(var(--header-height) + 2rem)' }}>
-            <Row
-              title={searchLoading ? `Searching "${query}"…` : `Results for "${query}"`}
-              movies={searchResults}
-              onSelectMovie={(m) => setSelectedMovieId(m.id)}
-            />
+            <Row title={searchLoading ? `Searching "${query}"…` : `Results for "${query}"`} movies={searchResults} />
             {searchError && (
               <div className="row" style={{ paddingLeft: 'clamp(1rem, 4vw, 3rem)' }}>
                 <div className="row-error">
@@ -113,32 +107,23 @@ export default function Home() {
                 </div>
               </div>
             )}
+            {!searchLoading && !searchError && query && searchResults.length === 0 && (
+              <div className="row" style={{ paddingLeft: 'clamp(1rem, 4vw, 3rem)' }}>
+                <p className="discover-empty">No results for &ldquo;{query}&rdquo;. Try a different title.</p>
+              </div>
+            )}
           </div>
         ) : (
           <>
-            <div id="trending">
-              <Row
-                title="Trending Now"
-                endpoint="/trending/movie/week"
-                isLargeRow
-                onSelectMovie={(m) => setSelectedMovieId(m.id)}
-              />
-            </div>
-            <div id="popular">
-              <Row title="Popular Movies" endpoint="/movie/popular" onSelectMovie={(m) => setSelectedMovieId(m.id)} />
-            </div>
-            <div id="top-rated">
-              <Row title="Top Rated" endpoint="/movie/top_rated" onSelectMovie={(m) => setSelectedMovieId(m.id)} />
-            </div>
+            <Row title="Trending Now" endpoint="/trending/movie/week" isLargeRow />
+            <Row title="Popular Movies" endpoint="/movie/popular" />
+            <Row title="Top Rated" endpoint="/movie/top_rated" />
+            <Discover />
           </>
         )}
       </div>
 
       <Footer />
-
-      {selectedMovieId && (
-        <MovieDetailsModal movieId={selectedMovieId} onClose={() => setSelectedMovieId(null)} />
-      )}
     </>
   );
 }

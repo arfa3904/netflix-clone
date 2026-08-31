@@ -33,9 +33,11 @@ export default function Login() {
       await login({ identifier: identifier.trim(), password });
       const redirectTo = location.state?.from?.pathname ?? '/';
       navigate(redirectTo, { replace: true });
+      // No setLoading(false) here — navigation unmounts this component on
+      // success, so resetting state afterwards would just be a stray
+      // setState on an unmounting component.
     } catch (err) {
       setError(err.message || 'Login failed. Try again.');
-    } finally {
       setLoading(false);
     }
   }

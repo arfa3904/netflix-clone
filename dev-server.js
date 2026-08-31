@@ -16,7 +16,9 @@ const routes = {
   '/api/login': () => import('./api/login.js'),
   '/api/logout': () => import('./api/logout.js'),
   '/api/me': () => import('./api/me.js'),
+  '/api/profile': () => import('./api/profile.js'),
   '/api/tmdb': () => import('./api/tmdb.js'),
+  '/api/watchlist': () => import('./api/watchlist.js'),
 };
 
 function readBody(req) {

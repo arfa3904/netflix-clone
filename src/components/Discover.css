@@ -1,0 +1,104 @@
+.discover {
+  padding: 0 clamp(1rem, 4vw, 3rem) 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.discover-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+
+.discover-genres {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.discover-pill {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.45rem 0.95rem;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.discover-pill:hover {
+  color: var(--color-text);
+  border-color: var(--color-border-strong);
+}
+
+.discover-pill--active {
+  background: var(--gradient-brand);
+  border-color: transparent;
+  color: #fff;
+}
+
+.discover-sort {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.discover-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.discover-grid .movie-card {
+  min-width: 0;
+  max-width: none;
+  width: 100%;
+}
+
+.discover-skeleton {
+  aspect-ratio: 2 / 3;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(100deg, var(--color-bg-surface) 30%, var(--color-bg-surface-hover) 50%, var(--color-bg-surface) 70%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.discover-empty {
+  color: var(--color-text-faint);
+  font-size: 0.9rem;
+  padding: 1rem 0;
+}
+
+.discover-load-more {
+  display: block;
+  margin: 1.5rem auto 0;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-text);
+  font-weight: 700;
+  font-size: 0.88rem;
+  padding: 0.65rem 1.75rem;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.discover-load-more:hover {
+  background: var(--color-bg-surface-hover);
+}
+
+@media (max-width: 768px) {
+  .discover-grid {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 0.65rem;
+  }
+}

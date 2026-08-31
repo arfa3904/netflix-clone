@@ -13,7 +13,7 @@ function SkeletonRow({ count = 8, isLargeRow = false }) {
   );
 }
 
-function Row({ title, endpoint, isLargeRow = false, onSelectMovie, movies: providedMovies }) {
+function Row({ title, endpoint, isLargeRow = false, movies: providedMovies }) {
   const [movies, setMovies] = useState(providedMovies || []);
   const [loading, setLoading] = useState(!providedMovies);
   const [error, setError] = useState(null);
@@ -92,7 +92,7 @@ function Row({ title, endpoint, isLargeRow = false, onSelectMovie, movies: provi
       <h2 className="row-title">{title}</h2>
       <div className="row-posters">
         {movies.map((movie) => (
-          <MovieCard key={movie.id} movie={movie} isLarge={isLargeRow} onSelect={onSelectMovie} />
+          <MovieCard key={movie.id} movie={movie} isLarge={isLargeRow} />
         ))}
       </div>
     </div>

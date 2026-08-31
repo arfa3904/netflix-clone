@@ -21,3 +21,8 @@ export function toSafeUser(user) {
   if (!user) return null;
   return { id: user.id, uname: user.uname, email: user.email, phone: user.phone };
 }
+
+export function isValidMovieId(value) {
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0;
+}

@@ -55,3 +55,35 @@ export async function fetchMovieDetails(id) {
 export function searchMovies(query, page = 1) {
   return fetchData('/search/movie', { query, page });
 }
+
+/** Cast/crew for a movie. Returns { cast: [...], crew: [...] } from TMDB. */
+export async function fetchMovieCredits(id) {
+  const data = await requestJson(buildUrl(`/movie/${id}/credits`));
+  return { cast: data?.cast || [], crew: data?.crew || [] };
+}
+
+/** Trailers/teasers for a movie, filtered down to embeddable YouTube videos. */
+export async function fetchMovieVideos(id) {
+  const data = await requestJson(buildUrl(`/movie/${id}/videos`));
+  const results = Array.isArray(data?.results) ? data.results : [];
+  return results.filter((v) => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser'));
+}
+
+export function fetchMovieRecommendations(id, page = 1) {
+  return fetchData(`/movie/${id}/recommendations`, { page });
+}
+
+export async function fetchGenres() {
+  const data = await requestJson(buildUrl('/genre/movie/list'));
+  return data?.genres || [];
+}
+
+/** Server-side TMDB discover, for genre/sort/year filtering. */
+export function discoverMovies({ genreId, sortBy, year, page = 1 } = {}) {
+  return fetchData('/discover/movie', {
+    with_genres: genreId,
+    sort_by: sortBy,
+    primary_release_year: year,
+    page,
+  });
+}

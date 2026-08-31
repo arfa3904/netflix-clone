@@ -16,6 +16,8 @@ const ALLOWED_PREFIXES = [
   '/discover/movie',
 ];
 
+const PASSTHROUGH_PARAMS = ['query', 'with_genres', 'sort_by', 'primary_release_year', 'append_to_response'];
+
 const REQUEST_TIMEOUT_MS = 10000;
 
 // Uses node:https rather than the global fetch: some network setups (proxies,
@@ -59,7 +61,7 @@ export default async function handler(req, res) {
     });
   }
 
-  const { endpoint, query: searchQuery, page } = req.query || {};
+  const { endpoint, page } = req.query || {};
 
   if (!endpoint || typeof endpoint !== 'string' || !endpoint.startsWith('/')) {
     return res.status(400).json({ success: false, message: 'A valid "endpoint" query parameter is required.' });
@@ -72,8 +74,16 @@ export default async function handler(req, res) {
 
   const url = new URL(`${BASE_URL}${endpoint}`);
   url.searchParams.set('api_key', apiKey);
-  if (searchQuery) url.searchParams.set('query', String(searchQuery));
   if (page) url.searchParams.set('page', String(page));
+  // Small allowlist of pass-through params for search/discover — TMDB is the
+  // only downstream host either way, so this just shapes which of *its*
+  // query params callers can set, not an arbitrary-proxy risk.
+  for (const key of PASSTHROUGH_PARAMS) {
+    const value = req.query?.[key];
+    if (value !== undefined && value !== null && value !== '') {
+      url.searchParams.set(key, String(value));
+    }
+  }
 
   try {
     // One retry: transient resets on the first connection attempt are common
