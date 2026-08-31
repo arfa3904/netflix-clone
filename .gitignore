@@ -28,7 +28,6 @@ dist-ssr
 .env.local
 .env.*.local
 .env.production
-backend/.env
 
 # Test coverage
 coverage

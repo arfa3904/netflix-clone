@@ -1,97 +1,51 @@
-// Vercel serverless functions - use relative paths /api/*
+// Talks to the /api/* serverless functions. The session lives in an HttpOnly
+// cookie set by the server — this file never touches localStorage or reads
+// the cookie directly, since client JS can't (and shouldn't be able to).
 const API_BASE = '/api';
 
-const AUTH_KEY = 'netflex_auth';
-
-export function getStoredUser() {
+async function apiRequest(path, options = {}) {
+  let res;
   try {
-    const raw = localStorage.getItem(AUTH_KEY);
-    return raw ? JSON.parse(raw) : null;
+    res = await fetch(`${API_BASE}${path}`, {
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+      ...options,
+    });
   } catch {
-    return null;
+    throw new Error('Cannot reach the server. Check your connection and try again.');
   }
-}
 
-export function setStoredUser(user) {
+  let data = null;
   try {
-    localStorage.setItem(AUTH_KEY, JSON.stringify(user));
-  } catch {}
-}
-
-export function clearStoredUser() {
-  try {
-    localStorage.removeItem(AUTH_KEY);
-  } catch {}
-}
-
-export async function register({ uname, email, phone, password }) {
-  let res;
-  try {
-    res = await fetch(`${API_BASE}/register`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ uname, email, phone, password }),
-    });
-  } catch (e) {
-    console.error('[auth] Register fetch error:', e);
-    throw new Error('Cannot reach server. Please check your connection.');
+    data = await res.json();
+  } catch {
+    // Some responses (e.g. 405) may not have a JSON body.
   }
 
   if (!res.ok) {
-    let errorData;
-    try {
-      errorData = await res.json();
-    } catch {
-      throw new Error(`Server error: ${res.status} ${res.statusText}`);
-    }
-    throw new Error(errorData.message || 'Registration failed');
+    throw new Error(data?.message || `Request failed (${res.status})`);
   }
-
-  let data;
-  try {
-    data = await res.json();
-  } catch (e) {
-    console.error('[auth] Register JSON parse error:', e);
-    throw new Error('Invalid response from server');
-  }
-
   return data;
 }
 
-export async function login({ identifier, password }) {
-  let res;
-  try {
-    res = await fetch(`${API_BASE}/login`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ identifier, password }),
-    });
-  } catch (e) {
-    console.error('[auth] Login fetch error:', e);
-    throw new Error('Cannot reach server. Please check your connection.');
-  }
+export function register({ uname, email, phone, password }) {
+  return apiRequest('/register', {
+    method: 'POST',
+    body: JSON.stringify({ uname, email, phone, password }),
+  });
+}
 
-  if (!res.ok) {
-    let errorData;
-    try {
-      errorData = await res.json();
-    } catch {
-      throw new Error(`Server error: ${res.status} ${res.statusText}`);
-    }
-    throw new Error(errorData.message || 'Login failed');
-  }
+export function login({ identifier, password }) {
+  return apiRequest('/login', {
+    method: 'POST',
+    body: JSON.stringify({ identifier, password }),
+  });
+}
 
-  let data;
-  try {
-    data = await res.json();
-  } catch (e) {
-    console.error('[auth] Login JSON parse error:', e);
-    throw new Error('Invalid response from server');
-  }
+export function logout() {
+  return apiRequest('/logout', { method: 'POST' });
+}
 
-  return data;
+export function fetchCurrentUser() {
+  return apiRequest('/me', { method: 'GET' });
 }

@@ -1,38 +1,38 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { login, setStoredUser } from '../services/auth';
-import './Login.css';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import './Auth.css';
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { login } = useAuth();
+
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loginType, setLoginType] = useState('email');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [loginType, setLoginType] = useState('email');
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
 
     if (!identifier.trim()) {
-      setError('Enter your email or phone number.');
+      setError(loginType === 'email' ? 'Enter your email.' : 'Enter your mobile number.');
       return;
     }
-    if (!password.trim()) {
+    if (!password) {
       setError('Enter your password.');
       return;
     }
 
     setLoading(true);
     try {
-      const data = await login({ identifier: identifier.trim(), password });
-      if (data.success && data.user) {
-        setStoredUser(data.user);
-        navigate('/', { replace: true });
-      } else {
-        setError(data.message || 'Login failed. Try again.');
-      }
+      await login({ identifier: identifier.trim(), password });
+      const redirectTo = location.state?.from?.pathname ?? '/';
+      navigate(redirectTo, { replace: true });
     } catch (err) {
       setError(err.message || 'Login failed. Try again.');
     } finally {
@@ -41,90 +41,95 @@ export default function Login() {
   }
 
   return (
-    <div className="login-page">
-      <div className="login-left">
-        <div className="login-left-bg" />
-        <div className="login-left-content">
-          <div className="login-left-card">
-            <h2 className="login-left-title">Welcome to the community</h2>
-            <p className="login-left-sub">Login to explore</p>
-          </div>
-          <div className="login-dots">
-            <span className="login-dot login-dot-active" />
-            <span className="login-dot" />
-            <span className="login-dot" />
-            <span className="login-dot" />
-            <span className="login-dot" />
-          </div>
+    <div className="auth-page">
+      <div className="auth-showcase">
+        <div className="auth-showcase-glow" aria-hidden="true" />
+        <div className="auth-showcase-content">
+          <p className="auth-brand">
+            Cine<span className="navbar-logo-accent">Vault</span>
+          </p>
+          <h2 className="auth-showcase-title">Unlimited movies, curated for you.</h2>
+          <p className="auth-showcase-sub">Sign in to pick up where you left off.</p>
         </div>
       </div>
-      <div className="login-right">
-        <div className="login-panel">
-          <h1 className="login-title">Login your account!</h1>
 
-          <div className="login-tabs">
+      <div className="auth-panel-wrap">
+        <div className="auth-panel">
+          <h1 className="auth-heading">Welcome back</h1>
+          <p className="auth-subheading">Sign in to continue browsing.</p>
+
+          <div className="auth-tabs" role="tablist">
             <button
               type="button"
-              className={`login-tab ${loginType === 'email' ? 'login-tab-active' : ''}`}
+              role="tab"
+              aria-selected={loginType === 'email'}
+              className={`auth-tab ${loginType === 'email' ? 'auth-tab-active' : ''}`}
               onClick={() => setLoginType('email')}
             >
-              E-mail
+              Email
             </button>
             <button
               type="button"
-              className={`login-tab ${loginType === 'mobile' ? 'login-tab-active' : ''}`}
+              role="tab"
+              aria-selected={loginType === 'mobile'}
+              className={`auth-tab ${loginType === 'mobile' ? 'auth-tab-active' : ''}`}
               onClick={() => setLoginType('mobile')}
             >
-              Mobile Number
+              Mobile number
             </button>
           </div>
 
-          {error && <div className="login-error">{error}</div>}
+          {error && (
+            <div className="auth-error" role="alert">
+              {error}
+            </div>
+          )}
 
-          <form onSubmit={handleSubmit} className="login-form">
-            <div className="login-input-wrap">
-              <span className="login-input-icon" aria-hidden>✉</span>
+          <form onSubmit={handleSubmit} className="auth-form" noValidate>
+            <label className="auth-field">
+              <span className="auth-label">{loginType === 'email' ? 'Email' : 'Mobile number'}</span>
               <input
-                type="text"
-                placeholder={loginType === 'email' ? 'Email' : 'Mobile Number'}
+                type={loginType === 'email' ? 'email' : 'tel'}
+                placeholder={loginType === 'email' ? 'you@example.com' : '+1 555 000 0000'}
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                className="login-input"
+                className="auth-input"
                 autoComplete="username"
                 disabled={loading}
               />
-            </div>
-            <div className="login-password-row">
-              <div className="login-input-wrap">
-                <span className="login-input-icon" aria-hidden>🔒</span>
+            </label>
+
+            <label className="auth-field">
+              <span className="auth-label">Password</span>
+              <div className="auth-password-wrap">
                 <input
-                  type="password"
-                  placeholder="Password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="login-input"
+                  className="auth-input"
                   autoComplete="current-password"
                   disabled={loading}
                 />
+                <button
+                  type="button"
+                  className="auth-password-toggle"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  tabIndex={-1}
+                >
+                  {showPassword ? '🙈' : '👁'}
+                </button>
               </div>
-              <a href="#forgot" className="login-forgot">Forgot password?</a>
-            </div>
-            <button type="submit" className="login-button" disabled={loading}>
-              {loading ? 'Signing In...' : 'Continue'}
+            </label>
+
+            <button type="submit" className="auth-submit" disabled={loading}>
+              {loading ? 'Signing in…' : 'Sign in'}
             </button>
           </form>
 
-          <div className="login-divider">
-            <span>Sign in With</span>
-          </div>
-          <div className="login-social">
-            <button type="button" className="login-social-btn" aria-label="Facebook" title="Facebook">f</button>
-            <button type="button" className="login-social-btn login-social-google" aria-label="Google" title="Google">G</button>
-            <button type="button" className="login-social-btn login-social-apple" aria-label="Apple" title="Apple">⌘</button>
-          </div>
-
-          <p className="login-footer">
-            Dont have an account? <Link to="/register">Sign up</Link>
+          <p className="auth-footer">
+            Don&rsquo;t have an account? <Link to="/register">Create one</Link>
           </p>
         </div>
       </div>

@@ -1,36 +1,64 @@
+import { useState } from 'react';
 import './Banner.css';
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/original';
 
-function Banner({ movie }) {
+function truncate(str, n) {
+  return str?.length > n ? `${str.slice(0, n - 1)}…` : str || '';
+}
+
+function Banner({ movie, onSelectMovie }) {
+  const [imgError, setImgError] = useState(false);
+
   if (!movie) return null;
 
+  const title = movie.title || movie.name;
   const backdropPath = movie.backdrop_path || movie.poster_path;
-  if (!backdropPath) return null;
-
-  const backgroundImage = `${IMAGE_BASE_URL}${backdropPath}`;
-  const truncate = (str, n) =>
-    str?.length > n ? `${str.slice(0, n - 1)}...` : str || '';
+  const year = (movie.release_date || movie.first_air_date || '').slice(0, 4);
+  const rating = typeof movie.vote_average === 'number' ? movie.vote_average.toFixed(1) : null;
+  const showImage = backdropPath && !imgError;
 
   return (
     <header
       className="banner"
-      style={{
-        backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.5) 50%, #111 100%), url(${backgroundImage})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center center',
-      }}
+      style={
+        showImage
+          ? {
+              backgroundImage: `linear-gradient(to bottom, rgba(10,10,12,0.25) 0%, rgba(10,10,12,0.55) 55%, var(--color-bg) 100%), url(${IMAGE_BASE_URL}${backdropPath})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center center',
+            }
+          : undefined
+      }
     >
+      {backdropPath && (
+        <img
+          src={`${IMAGE_BASE_URL}${backdropPath}`}
+          alt=""
+          className="banner-image-probe"
+          onError={() => setImgError(true)}
+        />
+      )}
+      {!showImage && <div className="banner-fallback-gradient" aria-hidden="true" />}
       <div className="banner-overlay" />
       <div className="banner-contents">
-        <h1 className="banner-title">{movie.title || movie.name}</h1>
-        <p className="banner-description">{truncate(movie.overview, 150)}</p>
+        <p className="banner-eyebrow">Featured this week</p>
+        <h1 className="banner-title">{title}</h1>
+        <div className="banner-meta">
+          {year && <span>{year}</span>}
+          {rating && <span className="banner-meta-rating">★ {rating}</span>}
+        </div>
+        <p className="banner-description">{truncate(movie.overview, 170)}</p>
         <div className="banner-buttons">
           <button type="button" className="banner-button banner-button--play">
-            ▶ Play
+            <span aria-hidden="true">▶</span> Play
           </button>
-          <button type="button" className="banner-button banner-button--list">
-            + My List
+          <button
+            type="button"
+            className="banner-button banner-button--list"
+            onClick={() => onSelectMovie?.(movie)}
+          >
+            More Info
           </button>
         </div>
       </div>

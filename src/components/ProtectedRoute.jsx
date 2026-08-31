@@ -1,9 +1,14 @@
 import { Navigate, useLocation } from 'react-router-dom';
-import { getStoredUser } from '../services/auth';
+import { useAuth } from '../context/AuthContext';
+import RouteLoading from './RouteLoading';
 
 export default function ProtectedRoute({ children }) {
-  const user = getStoredUser();
+  const { user, loading } = useAuth();
   const location = useLocation();
+
+  if (loading) {
+    return <RouteLoading />;
+  }
 
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
